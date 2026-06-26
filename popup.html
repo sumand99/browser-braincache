@@ -85,6 +85,70 @@
       background: rgba(255,255,255,0.25);
     }
 
+    /* ─── Master power toggle in header ─── */
+    .power-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 4px 10px 4px 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      user-select: none;
+    }
+    .power-toggle:hover { background: rgba(255,255,255,0.22); }
+    .power-toggle-knob {
+      position: relative;
+      width: 30px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .power-toggle-knob input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .power-toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.25);
+      border-radius: 16px;
+      transition: background 0.2s;
+    }
+    .power-toggle-track::before {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      left: 2px;
+      top: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .power-toggle-knob input:checked + .power-toggle-track {
+      background: #34D399;
+    }
+    .power-toggle-knob input:checked + .power-toggle-track::before {
+      transform: translateX(14px);
+    }
+    .power-toggle-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.02em;
+    }
+    body.braincache-off .panel,
+    body.braincache-off .tab-nav,
+    body.braincache-off #mondayBanner {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    body.braincache-off .header { background: linear-gradient(135deg, #4B5563, #374151); }
+
     /* ─── Tabs Navigation ─── */
     .tab-nav {
       display: flex;
@@ -865,9 +929,16 @@
       <span class="header-icon">🛡️</span>
       <div>
         <h1>BrainCache</h1>
-        <div class="subtitle">Your tabs are backed up</div>
+        <div class="subtitle" id="headerSubtitle">Your tabs are backed up</div>
       </div>
     </div>
+    <label class="power-toggle" title="Enable / disable BrainCache">
+      <span class="power-toggle-knob">
+        <input type="checkbox" id="masterEnabled" checked>
+        <span class="power-toggle-track"></span>
+      </span>
+      <span class="power-toggle-label" id="powerLabel">ON</span>
+    </label>
   </div>
 
   <!-- Monday Morning Banner (hidden by default, shown by JS) -->

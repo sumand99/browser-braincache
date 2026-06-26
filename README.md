@@ -11,6 +11,10 @@ Your browser's external memory — auto-saves tab sessions, clusters by topic, t
 - **Focus Time Tracking** — tracks how long you spend on each domain per day, entirely local. Useful for freelancers and deep-work practitioners.
 - **Monday Morning Context Restore** — detects when you're starting a new week and surfaces your last Friday session with a summary so you can pick up right where you left off.
 
+## Enabling / Disabling
+
+The **ON / OFF toggle** in the top-right corner of the popup is a master power switch. Flip it off to pause all auto-snapshots and tab-change saves without losing your existing backups. Flip it back on to resume. The same toggle is mirrored in **Settings → Auto-Backup Enabled**.
+
 ## Privacy
 
 Zero cloud. Zero accounts. All data lives in `chrome.storage.local` — nothing leaves your browser.
@@ -30,6 +34,14 @@ Zero cloud. Zero accounts. All data lives in `chrome.storage.local` — nothing 
 | `Alt+Shift+T` | Open BrainCache popup |
 | `Alt+Shift+S` | Save snapshot now |
 | `Alt+Shift+D` | Toggle duplicate tab prevention |
+
+## Removing from Chrome
+
+1. Open `chrome://extensions`.
+2. Find **BrainCache** in the list.
+3. Click **Remove** → confirm.
+
+All locally stored snapshots are wiped automatically when the extension is removed. If you want to keep them first, use **Export** in the popup before uninstalling.
 
 ## Tech
 

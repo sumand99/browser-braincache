@@ -38,6 +38,32 @@ let tabSearchHighlightIdx = -1;
 /** @type {chrome.tabs.Tab[]} */
 let tabSearchLastMatches = [];
 
+// ─── Master power toggle ─────────────────────────────────────────────────
+const masterEnabled = $("#masterEnabled");
+const powerLabel = $("#powerLabel");
+const headerSubtitle = $("#headerSubtitle");
+
+function applyPowerState(on) {
+  document.body.classList.toggle("braincache-off", !on);
+  if (powerLabel) powerLabel.textContent = on ? "ON" : "OFF";
+  if (headerSubtitle) headerSubtitle.textContent = on ? "Your tabs are backed up" : "Paused — not saving";
+  // keep settings toggle in sync
+  const settingEl = $("#settingEnabled");
+  if (settingEl) settingEl.checked = on;
+}
+
+if (masterEnabled) {
+  masterEnabled.addEventListener("change", async () => {
+    const on = masterEnabled.checked;
+    applyPowerState(on);
+    // persist via existing saveSettings path (reads #settingEnabled)
+    const settingEl = $("#settingEnabled");
+    if (settingEl) settingEl.checked = on;
+    await saveSettings({ silent: true });
+    showToast(on ? "✅ BrainCache enabled" : "⏸️ BrainCache paused");
+  });
+}
+
 // ─── Tab Navigation ─────────────────────────────────────────────────────
 $$(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -843,7 +869,10 @@ async function loadSettings() {
   if (!resp.success) return;
 
   const s = resp.data;
-  $("#settingEnabled").checked = s.enabled !== false;
+  const isOn = s.enabled !== false;
+  $("#settingEnabled").checked = isOn;
+  if (masterEnabled) masterEnabled.checked = isOn;
+  applyPowerState(isOn);
   const totalMin = Math.min(1440, Math.max(60, parseInt(s.autoBackupInterval, 10) || 1440));
   $("#settingIntervalHours").value = Math.floor(totalMin / 60);
   $("#settingIntervalMins").value = totalMin % 60;
@@ -855,7 +884,14 @@ async function loadSettings() {
 
 ["settingEnabled", "settingIntervalHours", "settingIntervalMins", "settingTabChange", "settingDedupe", "settingMaxSnaps"].forEach(
   (id) => {
-    $(`#${id}`).addEventListener("change", () => void saveSettings());
+    $(`#${id}`).addEventListener("change", () => {
+      if (id === "settingEnabled") {
+        const on = $("#settingEnabled").checked;
+        if (masterEnabled) masterEnabled.checked = on;
+        applyPowerState(on);
+      }
+      void saveSettings();
+    });
   }
 );
 
