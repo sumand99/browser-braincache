@@ -1156,17 +1156,24 @@ parkBtn?.addEventListener("click", async () => {
 
 let mondaySnapshotId = null;
 
-async function checkMondayContext() {
+async function checkMondayContext(force = false) {
   const banner = $("#mondayBanner");
   if (!banner) return;
-  const resp = await sendMessage({ action: "getMondayContext" });
-  if (!resp.success || !resp.data) return;
+  const resp = await sendMessage({ action: "getMondayContext", force });
+  if (!resp.success || !resp.data) {
+    if (force) showToast("No previous session found to restore.");
+    return;
+  }
 
   const ctx = resp.data;
   mondaySnapshotId = ctx.snapshotId;
   $("#mondaySummary").textContent = ctx.summary;
   banner.style.display = "block";
+  // scroll banner into view when triggered manually
+  if (force) banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+
+$("#mondayCheckBtn")?.addEventListener("click", () => checkMondayContext(true));
 
 $("#mondayRestoreBtn")?.addEventListener("click", async () => {
   if (!mondaySnapshotId) return;

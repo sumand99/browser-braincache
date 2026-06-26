@@ -962,7 +962,7 @@ function dayOfWeek(isoString) {
   try { return new Date(isoString).getDay(); } catch { return -1; }
 }
 
-async function getMondayMorningContext() {
+async function getMondayMorningContext(force = false) {
   const now = new Date();
   const todayDay = now.getDay(); // 0=Sun, 1=Mon ... 5=Fri, 6=Sat
   const snaps = await getSnapshots();
@@ -977,7 +977,7 @@ async function getMondayMorningContext() {
   const isAfterWeekend = (todayDay === 1 || todayDay === 2) && (lastDay >= 4 || lastDay === 0);
   const isDifferentDay = lastDate !== todayDate;
 
-  if (!isAfterWeekend || !isDifferentDay) return null;
+  if (!force && (!isAfterWeekend || !isDifferentDay)) return null;
 
   const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const clusters = clusterTabs(
@@ -1356,7 +1356,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         case "getMondayContext":
-          sendResponse({ success: true, data: await getMondayMorningContext() });
+          sendResponse({ success: true, data: await getMondayMorningContext(!!msg.force) });
           break;
 
         case "getClusterSummary": {
