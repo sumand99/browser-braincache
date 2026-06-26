@@ -769,6 +769,234 @@ async function updateSettings(newSettings) {
   await setupAlarm();
 }
 
+// ─── Feature: Tab Time Tracking ────────────────────────────────────────
+// Tracks time spent per domain across sessions using snapshot timestamps + active-tab events.
+
+let activeTabStartTime = Date.now();
+let activeTabDomain = null;
+
+function domainFromUrl(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol === "chrome:" || u.protocol === "chrome-extension:" || u.protocol === "about:") return null;
+    return u.hostname.replace(/^www\./, "");
+  } catch { return null; }
+}
+
+async function flushTimeForDomain(domain, ms) {
+  if (!domain || ms < 1000) return;
+  const data = await chrome.storage.local.get(["tabTimeToday"]);
+  const today = new Date().toISOString().slice(0, 10);
+  const record = data.tabTimeToday || { date: today, domains: {} };
+  if (record.date !== today) { record.date = today; record.domains = {}; }
+  record.domains[domain] = (record.domains[domain] || 0) + ms;
+  await chrome.storage.local.set({ tabTimeToday: record });
+}
+
+chrome.tabs.onActivated.addListener(async (info) => {
+  const now = Date.now();
+  await flushTimeForDomain(activeTabDomain, now - activeTabStartTime);
+  activeTabStartTime = now;
+  try {
+    const tab = await chrome.tabs.get(info.tabId);
+    activeTabDomain = domainFromUrl(tab.url || "");
+  } catch { activeTabDomain = null; }
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab.active) {
+    const now = Date.now();
+    await flushTimeForDomain(activeTabDomain, now - activeTabStartTime);
+    activeTabStartTime = now;
+    activeTabDomain = domainFromUrl(tab.url || "");
+  }
+});
+
+async function getTabTimeToday() {
+  const data = await chrome.storage.local.get(["tabTimeToday"]);
+  const today = new Date().toISOString().slice(0, 10);
+  const record = data.tabTimeToday || { date: today, domains: {} };
+  if (record.date !== today) return { date: today, domains: {} };
+  return record;
+}
+
+// ─── Feature: AI Tab Summary (cluster-based, no API key required) ───────
+// Groups open tabs into topic clusters by domain/keyword heuristics and
+// produces a human-readable summary sentence per cluster.
+
+const CLUSTER_RULES = [
+  { label: "Coding & Dev Tools",  patterns: ["github.com","stackoverflow.com","developer.","docs.","localhost","127.0.0.1","codepen.io","jsfiddle.net","replit.com","codesandbox.io","npmjs.com","pypi.org","devdocs.io"] },
+  { label: "Work & Productivity", patterns: ["notion.so","asana.com","trello.com","jira","confluence","linear.app","monday.com","airtable.com","clickup.com","basecamp.com","todoist.com","slack.com","teams.microsoft.com","meet.google.com","zoom.us","calendar.google.com","mail.google.com","outlook."] },
+  { label: "Research & Reading",  patterns: ["wikipedia.org","medium.com","substack.com","arxiv.org","scholar.google","researchgate.net","jstor.org","semanticscholar.org","nature.com","sciencedirect.com","hn.algolia","news.ycombinator.com","reddit.com"] },
+  { label: "Video & Entertainment",patterns: ["youtube.com","netflix.com","primevideo.com","hotstar.com","twitch.tv","vimeo.com","dailymotion.com","spotify.com","soundcloud.com","music.youtube.com"] },
+  { label: "Shopping",            patterns: ["amazon.","flipkart.com","myntra.com","snapdeal.com","meesho.com","ebay.","etsy.com","shopify.","bigbasket.com","swiggy.com","zomato.com"] },
+  { label: "Finance & Banking",   patterns: ["bank","finance","trading","zerodha.com","groww.in","moneycontrol.com","nseindia.com","bseindia.com","paytm.com","phonepe.com"] },
+  { label: "Social Media",        patterns: ["twitter.com","x.com","facebook.com","instagram.com","linkedin.com","threads.net","mastodon","pinterest.com","snapchat.com"] },
+  { label: "News",                patterns: ["bbc.com","cnn.com","ndtv.com","thehindu.com","hindustantimes.com","livemint.com","economictimes.","techcrunch.com","theverge.com","wired.com","arstechnica.com"] },
+  { label: "Cloud & Storage",     patterns: ["drive.google.com","docs.google.com","sheets.google.com","slides.google.com","dropbox.com","onedrive.live.com","box.com","icloud.com"] },
+  { label: "Learning & Courses",  patterns: ["udemy.com","coursera.org","edx.org","khanacademy.org","pluralsight.com","skillshare.com","brilliant.org","codecademy.com","freecodecamp.org"] },
+];
+
+function clusterTabs(tabs) {
+  const clusters = {};
+  const uncategorized = [];
+
+  for (const tab of tabs) {
+    const domain = domainFromUrl(tab.url) || "";
+    const titleLower = (tab.title || "").toLowerCase();
+    const fullStr = domain + " " + titleLower;
+    let matched = false;
+    for (const rule of CLUSTER_RULES) {
+      if (rule.patterns.some((p) => fullStr.includes(p))) {
+        if (!clusters[rule.label]) clusters[rule.label] = [];
+        clusters[rule.label].push(tab);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) uncategorized.push(tab);
+  }
+
+  // Group uncategorized by domain
+  for (const tab of uncategorized) {
+    const domain = domainFromUrl(tab.url) || "Other";
+    if (!clusters[domain]) clusters[domain] = [];
+    clusters[domain].push(tab);
+  }
+
+  return clusters;
+}
+
+function buildAiSummary(tabs) {
+  if (!tabs || tabs.length === 0) return "No browsable tabs open right now.";
+  const clusters = clusterTabs(tabs);
+  const lines = [];
+  for (const [label, items] of Object.entries(clusters)) {
+    if (items.length === 1) {
+      lines.push(`${label}: "${items[0].title || items[0].url}"`);
+    } else {
+      const titles = items.slice(0, 3).map((t) => `"${(t.title || t.url).slice(0, 40)}"`).join(", ");
+      const more = items.length > 3 ? ` +${items.length - 3} more` : "";
+      lines.push(`${label} (${items.length} tabs): ${titles}${more}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+async function getAiTabSummary() {
+  const windows = await chrome.windows.getAll({ populate: true });
+  const tabs = [];
+  for (const win of windows) {
+    if (win.type !== "normal") continue;
+    for (const tab of (win.tabs || [])) {
+      const url = tab.url || "";
+      if (url.startsWith("chrome://") || url.startsWith("chrome-extension://") || url.startsWith("about:") || url.startsWith("edge://")) continue;
+      tabs.push(tab);
+    }
+  }
+  const summary = buildAiSummary(tabs);
+  const clusters = clusterTabs(tabs);
+  return { summary, clusters: Object.entries(clusters).map(([label, items]) => ({ label, count: items.length, titles: items.map((t) => t.title || t.url) })), totalTabs: tabs.length };
+}
+
+// ─── Feature: Park Mode (git stash for browser) ─────────────────────────
+// Save all current tabs as a named snapshot, then close them.
+
+async function parkSession(name) {
+  const trimmedName = (name || "Parked Session").trim().slice(0, 80);
+  const windows = await chrome.windows.getAll({ populate: true });
+  const snapshot = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp: new Date().toISOString(),
+    trigger: "park",
+    name: trimmedName,
+    parked: true,
+    windowCount: 0,
+    tabCount: 0,
+    windows: [],
+  };
+
+  const windowsToClose = [];
+  for (const win of windows) {
+    if (win.type !== "normal") continue;
+    const windowData = { id: win.id, focused: win.focused, state: win.state, tabs: [] };
+    for (const tab of (win.tabs || [])) {
+      const url = tab.url || "";
+      if (url.startsWith("chrome://") || url.startsWith("chrome-extension://") || url.startsWith("about:") || url.startsWith("edge://")) continue;
+      windowData.tabs.push({ url: tab.url, title: tab.title || "(Untitled)", favIconUrl: tab.favIconUrl || "", pinned: tab.pinned, index: tab.index });
+    }
+    if (windowData.tabs.length > 0) {
+      snapshot.windows.push(windowData);
+      snapshot.tabCount += windowData.tabs.length;
+      windowsToClose.push(win.id);
+    }
+  }
+  snapshot.windowCount = snapshot.windows.length;
+  if (snapshot.tabCount === 0) throw new Error("No tabs to park");
+
+  // Save snapshot first
+  await ensureProfilesMigrated();
+  const profileId = await getActiveProfileId();
+  const data = await chrome.storage.local.get(["snapshotsByProfile"]);
+  const by = { ...(data.snapshotsByProfile || {}) };
+  let snapshots = by[profileId] || [];
+  snapshots.push(snapshot);
+  if (snapshots.length > settings.maxSnapshots) snapshots = snapshots.slice(snapshots.length - settings.maxSnapshots);
+  by[profileId] = snapshots;
+  await chrome.storage.local.set({ snapshotsByProfile: by });
+
+  // Open a new empty tab so Chrome doesn't quit, then close all parked windows
+  await chrome.tabs.create({ url: "chrome://newtab" });
+  for (const winId of windowsToClose) {
+    try { await chrome.windows.remove(winId); } catch { /* already closed */ }
+  }
+  rebuildContextMenusImmediate();
+  return { tabCount: snapshot.tabCount, windowCount: snapshot.windowCount, name: trimmedName, id: snapshot.id };
+}
+
+// ─── Feature: Monday Morning Context Restore ────────────────────────────
+// On startup, check if today is Monday and last snapshot was Friday → offer restore.
+
+function dayOfWeek(isoString) {
+  try { return new Date(isoString).getDay(); } catch { return -1; }
+}
+
+async function getMondayMorningContext() {
+  const now = new Date();
+  const todayDay = now.getDay(); // 0=Sun, 1=Mon ... 5=Fri, 6=Sat
+  const snaps = await getSnapshots();
+  if (snaps.length === 0) return null;
+
+  const lastSnap = snaps[snaps.length - 1];
+  const lastDay = dayOfWeek(lastSnap.timestamp);
+  const lastDate = lastSnap.timestamp.slice(0, 10);
+  const todayDate = now.toISOString().slice(0, 10);
+
+  // Show if: today is Mon/Tue and last snapshot was Thu/Fri/Sat/Sun (weekend gap)
+  const isAfterWeekend = (todayDay === 1 || todayDay === 2) && (lastDay >= 4 || lastDay === 0);
+  const isDifferentDay = lastDate !== todayDate;
+
+  if (!isAfterWeekend || !isDifferentDay) return null;
+
+  const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const clusters = clusterTabs(
+    (lastSnap.windows || []).flatMap((w) => w.tabs || []).map((t) => ({ url: t.url, title: t.title }))
+  );
+  const clusterSummary = Object.entries(clusters).slice(0, 3).map(([label, items]) => `${label} (${items.length})`).join(", ");
+  const summary = clusterSummary
+    ? `Last ${dayNames[lastDay]} you had ${lastSnap.tabCount} tabs: ${clusterSummary}.`
+    : `Last ${dayNames[lastDay]} you had ${lastSnap.tabCount} tabs open.`;
+
+  return {
+    snapshotId: lastSnap.id,
+    lastDay: dayNames[lastDay],
+    lastDate,
+    tabCount: lastSnap.tabCount,
+    summary,
+  };
+}
+
 // ─── Badge ──────────────────────────────────────────────────────────────
 
 function setBadgeTabCount(count) {
@@ -1111,6 +1339,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "trimSnapshots":
           sendResponse({ success: true, data: await trimSnapshotsToHalf() });
           break;
+
+        // ── New features ──────────────────────────────────────────────
+        case "getAiSummary":
+          sendResponse({ success: true, data: await getAiTabSummary() });
+          break;
+
+        case "getTabTimeToday":
+          sendResponse({ success: true, data: await getTabTimeToday() });
+          break;
+
+        case "parkSession": {
+          const parkResult = await parkSession(msg.name);
+          sendResponse({ success: true, data: parkResult });
+          break;
+        }
+
+        case "getMondayContext":
+          sendResponse({ success: true, data: await getMondayMorningContext() });
+          break;
+
+        case "getClusterSummary": {
+          const summaryData = await getAiTabSummary();
+          sendResponse({ success: true, data: summaryData });
+          break;
+        }
 
         default:
           sendResponse({ success: false, error: "Unknown action" });

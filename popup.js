@@ -977,6 +977,193 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// ─── Feature #1: AI Tab Summary ─────────────────────────────────────────
+
+const CLUSTER_COLORS = [
+  "#0077C5","#00B894","#E17055","#6C5CE7","#FDCB6E",
+  "#00CEC9","#E84393","#55EFC4","#74B9FF","#A29BFE"
+];
+
+async function loadAiSummary() {
+  const loading = $("#aiSummaryLoading");
+  const content = $("#aiSummaryContent");
+  const list = $("#aiClusterList");
+  if (!loading || !content || !list) return;
+
+  loading.style.display = "block";
+  content.style.display = "none";
+
+  const resp = await sendMessage({ action: "getAiSummary" });
+  loading.style.display = "none";
+  if (!resp.success || !resp.data) {
+    list.innerHTML = '<div style="color:var(--gray);font-size:12px;padding:12px;">Could not load summary.</div>';
+    content.style.display = "block";
+    return;
+  }
+
+  const { clusters, totalTabs } = resp.data;
+  if (!clusters || clusters.length === 0) {
+    list.innerHTML = '<div style="color:var(--gray);font-size:12px;padding:12px;">No browsable tabs open right now.</div>';
+    content.style.display = "block";
+    return;
+  }
+
+  list.innerHTML = `<div style="font-size:11px;color:var(--gray);margin-bottom:8px;">${totalTabs} tabs grouped into ${clusters.length} topic${clusters.length !== 1 ? "s" : ""}:</div>` +
+    clusters.map((c, i) => {
+      const color = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
+      const tabRows = (c.titles || []).slice(0, 4).map((t) =>
+        `<div class="cluster-tab-row">· ${escapeHtml((t || "").slice(0, 60))}</div>`
+      ).join("");
+      const moreCount = (c.titles || []).length - 4;
+      const more = moreCount > 0 ? `<div class="cluster-tab-row" style="color:var(--gray);">+${moreCount} more</div>` : "";
+      return `<div class="cluster-card" style="border-left:3px solid ${color};">
+        <div class="cluster-label">
+          <span>${escapeHtml(c.label)}</span>
+          <span class="cluster-count" style="background:${color}18;color:${color};">${c.count} tab${c.count !== 1 ? "s" : ""}</span>
+        </div>
+        <div class="cluster-tabs">${tabRows}${more}</div>
+      </div>`;
+    }).join("");
+
+  content.style.display = "block";
+}
+
+$("#refreshSummaryBtn")?.addEventListener("click", () => void loadAiSummary());
+
+// Load AI summary when Brain tab is clicked
+$$(".tab-btn").forEach((btn) => {
+  if (btn.dataset.panel === "brain") {
+    btn.addEventListener("click", () => void loadAiSummary());
+  }
+  if (btn.dataset.panel === "time") {
+    btn.addEventListener("click", () => void loadFocusTime());
+  }
+});
+
+// ─── Feature #4: Focus Time Tracking ────────────────────────────────────
+
+function formatMs(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return "<1m";
+}
+
+async function loadFocusTime() {
+  const loading = $("#focusTimeLoading");
+  const content = $("#focusTimeContent");
+  const list = $("#focusTimeList");
+  const empty = $("#focusTimeEmpty");
+  if (!loading || !content || !list) return;
+
+  loading.style.display = "block";
+  content.style.display = "none";
+
+  const resp = await sendMessage({ action: "getTabTimeToday" });
+  loading.style.display = "none";
+  if (!resp.success || !resp.data) {
+    content.style.display = "block";
+    empty.style.display = "block";
+    return;
+  }
+
+  const { domains } = resp.data;
+  const entries = Object.entries(domains || {})
+    .filter(([, ms]) => ms >= 5000)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 15);
+
+  if (entries.length === 0) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    content.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+  const maxMs = entries[0][1];
+  list.innerHTML = entries.map(([domain, ms]) => {
+    const pct = Math.round((ms / maxMs) * 100);
+    return `<div class="time-row">
+      <span class="time-domain">${escapeHtml(domain)}</span>
+      <div class="time-bar-wrap"><div class="time-bar" style="width:${pct}%;"></div></div>
+      <span class="time-val">${formatMs(ms)}</span>
+    </div>`;
+  }).join("");
+  content.style.display = "block";
+}
+
+// ─── Feature #3: Park Mode ───────────────────────────────────────────────
+
+const parkBtn = $("#parkBtn");
+parkBtn?.addEventListener("click", async () => {
+  const name = prompt("Name this parked session (or leave blank):", "Parked Session");
+  if (name === null) return; // user cancelled
+  parkBtn.disabled = true;
+  parkBtn.textContent = "Parking…";
+  const resp = await sendMessage({ action: "parkSession", name: name.trim() || "Parked Session" });
+  parkBtn.disabled = false;
+  parkBtn.innerHTML = "<span>🅿️</span> Park Session (Stash & Close All)";
+  if (resp.success) {
+    showToast(`🅿️ Parked ${resp.data.tabCount} tabs as "${resp.data.name}"`);
+    await loadStats();
+    await loadSnapshots();
+    await loadHealth();
+  } else {
+    showToast("❌ " + (resp.error || "Park failed"));
+  }
+});
+
+// ─── Feature #5: Monday Morning Context Restore ──────────────────────────
+
+let mondaySnapshotId = null;
+
+async function checkMondayContext() {
+  const banner = $("#mondayBanner");
+  if (!banner) return;
+  const resp = await sendMessage({ action: "getMondayContext" });
+  if (!resp.success || !resp.data) return;
+
+  const ctx = resp.data;
+  mondaySnapshotId = ctx.snapshotId;
+  $("#mondaySummary").textContent = ctx.summary;
+  banner.style.display = "block";
+}
+
+$("#mondayRestoreBtn")?.addEventListener("click", async () => {
+  if (!mondaySnapshotId) return;
+  const resp = await sendMessage({ action: "restoreSnapshot", snapshotId: mondaySnapshotId });
+  if (resp.success) {
+    showToast("✅ Session restored!");
+    $("#mondayBanner").style.display = "none";
+  } else {
+    showToast("❌ " + (resp.error || "Restore failed"));
+  }
+});
+
+$("#mondayDismissBtn")?.addEventListener("click", () => {
+  $("#mondayBanner").style.display = "none";
+});
+
+// ─── Also add "park" to formatTrigger ────────────────────────────────────
+
+const _origFormatTrigger = formatTrigger;
+// patch trigger map to include park
+function formatTrigger(trigger) {
+  if (trigger === "park") return "Parked";
+  return _origFormatTrigger(trigger);
+}
+
+// ─── Extend init to load new features ───────────────────────────────────
+
+const _origInit = init;
+async function init() {
+  await _origInit();
+  await checkMondayContext();
+}
+
 function safeHost(url) {
   try {
     return new URL(url).hostname;

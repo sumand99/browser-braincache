@@ -810,6 +810,51 @@
     }
     .btn-xs:hover { background: var(--bg); }
     .btn-xs.danger { color: var(--red); border-color: var(--red); }
+
+    /* ─── Park Mode button ─── */
+    .park-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 24px); margin: 0 12px 10px;
+      padding: 10px; border-radius: 8px; border: 1.5px dashed var(--orange);
+      background: #FFF5F0; color: var(--orange); font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .park-btn:hover { background: #FFE8D6; }
+
+    /* ─── AI Brain Summary ─── */
+    .brain-header { padding: 12px 12px 6px; }
+    .brain-title { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+    .brain-hint { font-size: 11px; color: var(--gray); margin-bottom: 8px; line-height: 1.4; }
+    .btn-refresh {
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px;
+      background: white; font-size: 11px; cursor: pointer; color: var(--blue); font-weight: 600;
+    }
+    .btn-refresh:hover { background: var(--blue-light); }
+    .brain-loading { text-align: center; color: var(--gray); font-size: 12px; padding: 24px 0; }
+    .cluster-list { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .cluster-card {
+      background: white; border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 11px; transition: box-shadow 0.15s;
+    }
+    .cluster-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .cluster-label {
+      font-size: 11.5px; font-weight: 700; color: var(--blue); margin-bottom: 5px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .cluster-count {
+      background: var(--blue-light); color: var(--blue); border-radius: 10px;
+      padding: 1px 7px; font-size: 10px; font-weight: 700;
+    }
+    .cluster-tabs { display: flex; flex-direction: column; gap: 2px; }
+    .cluster-tab-row { font-size: 10.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ─── Focus Time ─── */
+    .time-list { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 7px; }
+    .time-row { display: flex; align-items: center; gap: 8px; }
+    .time-domain { font-size: 11.5px; font-weight: 600; color: var(--dark); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .time-bar-wrap { width: 90px; height: 7px; background: #EEF2F7; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+    .time-bar { height: 100%; background: var(--blue); border-radius: 4px; transition: width 0.4s; }
+    .time-val { font-size: 10.5px; color: var(--gray); width: 36px; text-align: right; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -825,9 +870,21 @@
     </div>
   </div>
 
+  <!-- Monday Morning Banner (hidden by default, shown by JS) -->
+  <div id="mondayBanner" style="display:none;background:linear-gradient(135deg,#0077C5,#005A9E);color:#fff;padding:10px 14px;font-size:11.5px;border-bottom:1px solid #004f8a;">
+    <div style="font-weight:700;margin-bottom:3px;">👋 Welcome back! Here's where you left off:</div>
+    <div id="mondaySummary" style="color:rgba(255,255,255,0.88);line-height:1.5;"></div>
+    <div style="margin-top:8px;display:flex;gap:7px;">
+      <button id="mondayRestoreBtn" style="padding:4px 10px;background:#fff;color:#0077C5;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;">Restore Session →</button>
+      <button id="mondayDismissBtn" style="padding:4px 10px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:5px;font-size:11px;cursor:pointer;">Dismiss</button>
+    </div>
+  </div>
+
   <!-- Tab Navigation -->
   <div class="tab-nav">
     <button class="tab-btn active" data-panel="backups">📦 Backups</button>
+    <button class="tab-btn" data-panel="brain">🧠 AI Summary</button>
+    <button class="tab-btn" data-panel="time">⏱️ Focus Time</button>
     <button class="tab-btn" data-panel="settings">⚙️ Settings</button>
   </div>
 
@@ -880,6 +937,11 @@
       <span>💾</span> Save Snapshot Now
     </button>
 
+    <!-- Park Mode -->
+    <button class="park-btn" id="parkBtn">
+      <span>🅿️</span> Park Session (Stash &amp; Close All)
+    </button>
+
     <div class="io-buttons">
       <button class="btn-io btn-export" id="exportBtn">📤 Export</button>
       <button class="btn-io btn-import" id="importBtn">📥 Import</button>
@@ -891,6 +953,32 @@
 
     <div class="snapshot-list" id="snapshotList">
       <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- AI Brain Summary Panel -->
+  <div class="panel" id="panel-brain">
+    <div class="brain-header">
+      <div class="brain-title">🧠 What are you working on?</div>
+      <div class="brain-hint">BrainCache groups your open tabs by topic so you instantly know where your focus is.</div>
+      <button class="btn-refresh" id="refreshSummaryBtn">↺ Refresh</button>
+    </div>
+    <div id="aiSummaryLoading" class="brain-loading">Analysing your tabs…</div>
+    <div id="aiSummaryContent" style="display:none;">
+      <div id="aiClusterList" class="cluster-list"></div>
+    </div>
+  </div>
+
+  <!-- Focus Time Panel -->
+  <div class="panel" id="panel-time">
+    <div class="brain-header">
+      <div class="brain-title">⏱️ Today's Focus Time</div>
+      <div class="brain-hint">Time spent per domain today (resets at midnight, stored locally).</div>
+    </div>
+    <div id="focusTimeLoading" class="brain-loading">Loading…</div>
+    <div id="focusTimeContent" style="display:none;">
+      <div id="focusTimeList" class="time-list"></div>
+      <div id="focusTimeEmpty" style="display:none;text-align:center;color:var(--gray);font-size:12px;padding:24px 0;">No time tracked yet today.<br/>Start browsing and come back!</div>
     </div>
   </div>
 
