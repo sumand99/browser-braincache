@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "BrainCache",
+  "version": "2.0.0",
+  "description": "Your browser's external memory — auto-saves tab sessions, clusters by topic, tracks focus time, and restores your context instantly.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "windows",
+    "contextMenus"
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+T",
+        "mac": "Alt+Shift+T"
+      },
+      "description": "Open BrainCache popup"
+    },
+    "save-snapshot": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Save tab snapshot now"
+    },
+    "toggle-dedupe": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "Toggle avoid duplicate tabs"
+    },
+    "open-popup": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
+      },
+      "description": "Open BrainCache popup (alternate)"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainCache</title>
+  <style>
+    :root {
+      --blue: #0077C5;
+      --blue-light: #E8F4FD;
+      --green: #00B894;
+      --green-light: #E6F9F1;
+      --red: #D63031;
+      --red-light: #FFE8E8;
+      --orange: #E17055;
+      --purple: #6C5CE7;
+      --dark: #1A1A2E;
+      --text: #333;
+      --gray: #888;
+      --border: #E0E0E0;
+      --bg: #FAFBFC;
+      --card: #FFFFFF;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 400px;
+      max-height: 680px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-y: auto;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, var(--blue), #005A9E);
+      color: white;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header .subtitle {
+      font-size: 10px;
+      opacity: 0.8;
+      margin-top: 1px;
+    }
+    .header-icon {
+      font-size: 22px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .header-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: white;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+    .header-btn:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
+    /* ─── Tabs Navigation ─── */
+    .tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: white;
+      position: sticky;
+      top: 59px;
+      z-index: 9;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--blue);
+      border-bottom-color: var(--blue);
+    }
+    .tab-btn:hover {
+      color: var(--blue);
+      background: var(--blue-light);
+    }
+
+    /* ─── Panels ─── */
+    .panel {
+      display: none;
+      padding: 12px;
+    }
+    .panel.active {
+      display: block;
+    }
+
+    /* ─── Stats Bar ─── */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat-card {
+      flex: 1;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--blue);
+    }
+    .stat-label {
+      font-size: 10px;
+      color: var(--gray);
+      margin-top: 2px;
+    }
+
+    /* ─── Save Now Button ─── */
+    .save-now-btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .save-now-btn:hover {
+      background: #00A383;
+    }
+    .save-now-btn:active {
+      transform: scale(0.98);
+    }
+    .save-now-btn.saving {
+      background: var(--gray);
+      pointer-events: none;
+    }
+
+    /* ─── Snapshot List ─── */
+    .snapshot-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .snapshot-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .snapshot-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 2px 8px rgba(0,119,197,0.1);
+    }
+    .snapshot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .snapshot-time {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+    .snapshot-trigger {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .trigger-auto { background: var(--blue-light); color: var(--blue); }
+    .trigger-manual { background: var(--green-light); color: var(--green); }
+    .trigger-startup { background: #F3F0FF; color: var(--purple); }
+    .trigger-tab-created,
+    .trigger-tab-closed,
+    .trigger-tab-loaded,
+    .trigger-window-opened,
+    .trigger-window-closed { background: #FFF3E0; color: var(--orange); }
+    .trigger-initial { background: var(--blue-light); color: var(--blue); }
+    .snapshot-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--gray);
+    }
+    .snapshot-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .btn-sm {
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.15s;
+    }
+    .btn-restore {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+    }
+    .btn-restore:hover { background: #005A9E; }
+    .btn-view {
+      background: white;
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+    .btn-view:hover { background: var(--blue-light); }
+    .btn-delete {
+      background: white;
+      color: var(--red);
+      border-color: var(--red);
+    }
+    .btn-delete:hover { background: var(--red-light); }
+
+    /* ─── Tab Detail View ─── */
+    .detail-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      z-index: 20;
+      overflow-y: auto;
+    }
+    .detail-overlay.show { display: block; }
+    .detail-header {
+      background: white;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--blue);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .back-btn:hover { background: var(--blue-light); }
+    .detail-content { padding: 12px; }
+    .window-group {
+      margin-bottom: 12px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .window-group-header {
+      padding: 8px 12px;
+      background: var(--blue-light);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-bottom: 1px solid #F0F0F0;
+      font-size: 11px;
+    }
+    .tab-item:last-child { border-bottom: none; }
+    .tab-favicon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      border-radius: 2px;
+    }
+    .tab-favicon--placeholder {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      background: #EEE;
+      border-radius: 2px;
+    }
+    .tab-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .tab-pinned {
+      font-size: 9px;
+      color: var(--orange);
+      font-weight: 600;
+    }
+    .tab-url {
+      font-size: 9px;
+      color: var(--gray);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 140px;
+    }
+
+    /* ─── Settings Panel ─── */
+    .settings-group {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .settings-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .settings-group label:last-child { margin-bottom: 0; }
+    .settings-group input[type="number"] {
+      width: 60px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .interval-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .interval-field {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .interval-field input[type="number"] {
+      width: 52px;
+    }
+    .interval-unit {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray);
+      min-width: 14px;
+    }
+    .toggle {
+      position: relative;
+      width: 38px;
+      height: 20px;
+    }
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #CCC;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 2px;
+      bottom: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider {
+      background: var(--green);
+    }
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(18px);
+    }
+    .settings-note {
+      font-size: 10px;
+      color: var(--gray);
+      margin-top: 4px;
+    }
+
+    /* ─── Import/Export ─── */
+    .io-buttons {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .btn-io {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      border: 1px solid;
+      transition: all 0.15s;
+    }
+    .btn-export {
+      background: var(--purple);
+      color: white;
+      border-color: var(--purple);
+    }
+    .btn-export:hover { opacity: 0.9; }
+    .btn-import {
+      background: white;
+      color: var(--purple);
+      border-color: var(--purple);
+    }
+    .btn-import:hover { background: #F3F0FF; }
+    .btn-danger {
+      background: var(--red);
+      color: white;
+      border-color: var(--red);
+    }
+    .btn-danger:hover { opacity: 0.9; }
+
+    /* ─── Empty State ─── */
+    .empty-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--gray);
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 8px; }
+    .empty-state h3 { font-size: 14px; color: var(--dark); margin-bottom: 4px; }
+    .empty-state p { font-size: 11px; }
+
+    /* ─── Toast ─── */
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--dark);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 50;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Hidden file input */
+    #importInput { display: none; }
+
+    /* ─── Workspace dropdown (Backups) ─── */
+    .workspace-picker-block {
+      margin-bottom: 12px;
+    }
+    .workspace-picker-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+    .workspace-picker-hint {
+      font-size: 10px;
+      color: var(--gray);
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+    .workspace-select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      background: white;
+      color: var(--dark);
+      cursor: pointer;
+    }
+    .workspace-select:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(0,119,197,0.12);
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ─── Smart tab search ─── */
+    .tab-search-block {
+      margin-bottom: 12px;
+    }
+    .tab-search-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+    .tab-search-hint {
+      font-size: 10px;
+      color: var(--gray);
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+    .tab-search-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .tab-search-input:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(0,119,197,0.12);
+    }
+    .tab-search-results {
+      margin-top: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      display: none;
+    }
+    .tab-search-results.has-results {
+      display: block;
+    }
+    .tab-search-item {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      border: none;
+      border-bottom: 1px solid #F0F0F0;
+      background: white;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+    }
+    .tab-search-item:last-child {
+      border-bottom: none;
+    }
+    .tab-search-item:hover,
+    .tab-search-item.is-highlighted {
+      background: var(--blue-light);
+    }
+    .tab-search-item-fav {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      object-fit: contain;
+      margin-top: 1px;
+    }
+    .tab-search-item-fav--ph {
+      background: #E8E8E8;
+    }
+    .tab-search-item-body {
+      min-width: 0;
+      flex: 1;
+    }
+    .tab-search-item-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dark);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab-search-item-host {
+      font-size: 10px;
+      color: var(--gray);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+    .tab-search-empty {
+      padding: 10px;
+      font-size: 11px;
+      color: var(--gray);
+      text-align: center;
+    }
+
+    /* ─── Snapshot search results ─── */
+    .snap-search-results {
+      margin-top: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      display: none;
+    }
+    .snap-search-results.has-results {
+      display: block;
+    }
+    .snap-search-section-title {
+      padding: 6px 10px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gray);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #F0F0F0;
+    }
+    .snap-search-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #F0F0F0;
+      background: white;
+    }
+    .snap-search-item:last-child {
+      border-bottom: none;
+    }
+    .snap-search-item-fav {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      object-fit: contain;
+      margin-top: 2px;
+    }
+    .snap-search-item-fav--ph {
+      background: #E8E8E8;
+      display: inline-block;
+    }
+    .snap-search-item-body {
+      min-width: 0;
+      flex: 1;
+    }
+    .snap-search-item-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dark);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .snap-search-item-meta {
+      font-size: 10px;
+      color: var(--gray);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .snap-search-item-restore {
+      flex-shrink: 0;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 5px;
+      border: 1px solid var(--blue);
+      background: var(--blue);
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .snap-search-item-restore:hover {
+      background: #005A9E;
+    }
+
+    /* ─── Storage health ─── */
+    .health-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+    .health-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .health-row:last-child { margin-bottom: 0; }
+    .health-label { color: var(--gray); font-weight: 600; }
+    .health-value { color: var(--dark); font-weight: 600; }
+    .btn-trim {
+      width: 100%;
+      margin-top: 8px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid var(--orange);
+      background: #FFF8F5;
+      color: var(--orange);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-trim:hover { background: #FFF0E8; }
+
+    .shortcuts-hint {
+      font-size: 10px;
+      color: var(--gray);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--blue);
+      cursor: pointer;
+      font-size: 10px;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .workspace-list {
+      font-size: 11px;
+      color: var(--text);
+    }
+    .workspace-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 0;
+      border-bottom: 1px solid #F0F0F0;
+    }
+    .workspace-item:last-child { border-bottom: none; }
+    .workspace-name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+    .workspace-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-xs {
+      padding: 2px 6px;
+      font-size: 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-xs:hover { background: var(--bg); }
+    .btn-xs.danger { color: var(--red); border-color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-icon">🛡️</span>
+      <div>
+        <h1>BrainCache</h1>
+        <div class="subtitle">Your tabs are backed up</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-panel="backups">📦 Backups</button>
+    <button class="tab-btn" data-panel="settings">⚙️ Settings</button>
+  </div>
+
+  <!-- Backups Panel -->
+  <div class="panel active" id="panel-backups">
+    <div class="workspace-picker-block">
+      <div class="workspace-picker-title">Workspace</div>
+      <p class="workspace-picker-hint">Pick <strong>Work</strong>, <strong>Personal</strong>, or another stack. Use <strong>Add new…</strong> at the bottom of the list to create a workspace (default active: <strong>Work</strong>).</p>
+      <label class="visually-hidden" for="workspaceSelect">Active workspace</label>
+      <select id="workspaceSelect" class="workspace-select" title="Where new snapshots are saved" aria-label="Workspace for backups"></select>
+    </div>
+
+    <div class="tab-search-block">
+      <div class="tab-search-title">Smart tab search</div>
+      <p class="tab-search-hint">Find an open tab or search saved snapshots by title, URL, or site. Use ↑↓ and Enter for open tabs.</p>
+      <label class="visually-hidden" for="tabSearchInput">Search open tabs and snapshots</label>
+      <input type="search" id="tabSearchInput" class="tab-search-input" placeholder="Search open tabs &amp; snapshots…" autocomplete="off" spellcheck="false">
+      <div id="tabSearchResults" class="tab-search-results" role="listbox" aria-label="Matching open tabs"></div>
+      <div id="snapSearchResults" class="snap-search-results" aria-label="Matching snapshots"></div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-value" id="statTabs">0</div>
+        <div class="stat-label">Open Tabs Now</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statSnapshots">0</div>
+        <div class="stat-label">Snapshots Saved</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statWindows">0</div>
+        <div class="stat-label">Windows Now</div>
+      </div>
+    </div>
+
+    <div class="health-card" id="healthCard">
+      <div class="health-row">
+        <span class="health-label">Storage (this extension)</span>
+        <span class="health-value" id="healthBytes">—</span>
+      </div>
+      <div class="health-row">
+        <span class="health-label">Oldest snapshot</span>
+        <span class="health-value" id="healthOldest">—</span>
+      </div>
+      <button type="button" class="btn-trim" id="trimBtn">Delete oldest half snapshots</button>
+    </div>
+
+    <button class="save-now-btn" id="saveNowBtn">
+      <span>💾</span> Save Snapshot Now
+    </button>
+
+    <div class="io-buttons">
+      <button class="btn-io btn-export" id="exportBtn">📤 Export</button>
+      <button class="btn-io btn-import" id="importBtn">📥 Import</button>
+    </div>
+    <div class="io-buttons">
+      <button class="btn-io btn-export" id="exportAllWsBtn" style="flex:1;">📤 All workspaces</button>
+    </div>
+    <input type="file" id="importInput" accept=".json">
+
+    <div class="snapshot-list" id="snapshotList">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="panel" id="panel-settings">
+    <div class="settings-group">
+      <label>
+        Auto-Backup Enabled
+        <div class="toggle">
+          <input type="checkbox" id="settingEnabled" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+    </div>
+
+    <div class="settings-group">
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Backup interval</div>
+      <div class="interval-row">
+        <div class="interval-field">
+          <input type="number" id="settingIntervalHours" min="0" max="24" value="24" step="1" title="Hours">
+          <span class="interval-unit">h</span>
+        </div>
+        <div class="interval-field">
+          <input type="number" id="settingIntervalMins" min="0" max="59" value="0" step="1" title="Minutes">
+          <span class="interval-unit">m</span>
+        </div>
+      </div>
+      <div class="settings-note">Default 24 hours. Total time must be between 1 hour and 24 hours.</div>
+    </div>
+
+    <div class="settings-group">
+      <label>
+        Save on tab changes
+        <div class="toggle">
+          <input type="checkbox" id="settingTabChange" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+      <div class="settings-note">Also saves when tabs are opened, closed, or loaded (debounced).</div>
+    </div>
+
+    <div class="settings-group">
+      <label>
+        Avoid duplicate tabs
+        <div class="toggle">
+          <input type="checkbox" id="settingDedupe" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+      <div class="settings-note">When you open a new tab to a URL you already have open, switch to that tab and close the new one. Does not affect refresh or long-open tabs.</div>
+    </div>
+
+    <div class="settings-group">
+      <label>
+        Max snapshots to keep
+        <input type="number" id="settingMaxSnaps" min="5" max="50" value="50" step="1">
+      </label>
+      <div class="settings-note">Between 5 and 50 per workspace; oldest are removed when the limit is reached.</div>
+    </div>
+
+    <div class="settings-group">
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Keyboard shortcuts</div>
+      <div class="settings-note">Save snapshot, toggle duplicate avoidance, open popup. Change keys in Chrome.</div>
+      <button type="button" class="link-btn" id="shortcutsLinkBtn" style="margin-top:6px;">Open shortcut settings</button>
+    </div>
+
+    <div class="settings-group">
+      <label style="margin-bottom: 10px;">
+        <input type="checkbox" id="importMergeWorkspaces" style="margin-right: 8px;">
+        When importing an “All workspaces” export, restore every workspace
+      </label>
+      <div class="settings-note">Use this for JSON from <strong>Export → All workspaces</strong> (it includes Work, Personal, and any extra stacks). <strong>Checked:</strong> merge snapshots into each matching workspace and add any missing workspaces from the file. <strong>Unchecked:</strong> import only into the workspace you have selected on the Backups tab.</div>
+    </div>
+
+    <div class="settings-group">
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Workspaces</div>
+      <div class="settings-note" style="margin-bottom: 8px;">Work and Personal are built-in (Work first). Extra workspaces can be renamed or removed.</div>
+      <div class="workspace-list" id="workspaceList"></div>
+    </div>
+
+    <div class="settings-group" style="margin-top: 16px;">
+      <button class="btn-io btn-danger" id="clearAllBtn" style="width: 100%;">🗑️ Delete All Snapshots</button>
+    </div>
+  </div>
+
+  <!-- Detail Overlay -->
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-header">
+      <button class="back-btn" id="backBtn">←</button>
+      <div>
+        <div style="font-size: 13px; font-weight: 600;" id="detailTitle">Snapshot Detail</div>
+        <div style="font-size: 10px; color: var(--gray);" id="detailMeta"></div>
+      </div>
+    </div>
+    <div class="detail-content" id="detailContent"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
